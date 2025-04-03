@@ -1,0 +1,163 @@
+import javax.persistence.Entity;
+import javax.persistence.Id;
+
+@Entity
+public class Account {
+    @Id
+    private int accountId;
+    private String accountHolder;
+    private double balance;
+
+    // Getters and setters
+    public int getAccountId() {
+        return accountId;
+    }
+
+    public void setAccountId(int accountId) {
+        this.accountId = accountId;
+    }
+
+    public String getAccountHolder() {
+        return accountHolder;
+    }
+
+    public void setAccountHolder(String accountHolder) {
+        this.accountHolder = accountHolder;
+    }
+
+    public double getBalance() {
+        return balance;
+    }
+
+    public void setBalance(double balance) {
+        this.balance = balance;
+    }
+}
+
+
+import javax.persistence.Entity;
+import javax.persistence.Id;
+
+@Entity
+public class Transaction {
+    @Id
+    private int transactionId;
+    private int fromAccountId;
+    private int toAccountId;
+    private double amount;
+
+    // Getters and setters
+    public int getTransactionId() {
+        return transactionId;
+    }
+
+    public void setTransactionId(int transactionId) {
+        this.transactionId = transactionId;
+    }
+
+    public int getFromAccountId() {
+        return fromAccountId;
+    }
+
+    public void setFromAccountId(int fromAccountId) {
+        this.fromAccountId = fromAccountId;
+    }
+
+    public int getToAccountId() {
+        return toAccountId;
+    }
+
+    public void setToAccountId(int toAccountId) {
+        this.toAccountId = toAccountId;
+    }
+
+    public double getAmount() {
+        return amount;
+    }
+
+    public void setAmount(double amount) {
+        this.amount = amount;
+    }
+}
+
+
+import org.springframework.transaction.annotation.Transactional;
+
+public class BankingService {
+
+    private AccountDAO accountDAO;
+    private TransactionDAO transactionDAO;
+
+    public BankingService(AccountDAO accountDAO, TransactionDAO transactionDAO) {
+        this.accountDAO = accountDAO;
+        this.transactionDAO = transactionDAO;
+    }
+
+    @Transactional
+    public void transferMoney(int fromAccountId, int toAccountId, double amount) {
+        Account fromAccount = accountDAO.getAccount(fromAccountId);
+        Account toAccount = accountDAO.getAccount(toAccountId);
+
+        if (fromAccount.getBalance() < amount) {
+            throw new RuntimeException("Insufficient funds.");
+        }
+
+        fromAccount.setBalance(fromAccount.getBalance() - amount);
+        toAccount.setBalance(toAccount.getBalance() + amount);
+
+        accountDAO.updateAccount(fromAccount);
+        accountDAO.updateAccount(toAccount);
+
+        Transaction transaction = new Transaction();
+        transaction.setFromAccountId(fromAccountId);
+        transaction.setToAccountId(toAccountId);
+        transaction.setAmount(amount);
+
+        transactionDAO.saveTransaction(transaction);
+    }
+}
+
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class AppConfig {
+    
+    @Bean
+    public AccountDAO accountDAO() {
+        return new AccountDAO();
+    }
+
+    @Bean
+    public TransactionDAO transactionDAO() {
+        return new TransactionDAO();
+    }
+
+    @Bean
+    public BankingService bankingService() {
+        return new BankingService(accountDAO(), transactionDAO());
+    }
+}
+
+
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+public class App {
+    public static void main(String[] args) {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+        
+        BankingService bankingService = context.getBean(BankingService.class);
+        
+        try {
+            bankingService.transferMoney(1, 2, 500);
+            System.out.println("Transfer successful.");
+        } catch (RuntimeException e) {
+            System.out.println("Transfer failed: " + e.getMessage());
+        }
+        
+        context.close();
+    }
+}
+
+
